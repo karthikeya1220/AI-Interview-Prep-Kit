@@ -1,36 +1,147 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Interview Prep Kit
 
-## Getting Started
+Full-stack engineering assessment for Trao. The app turns a pasted job description, company URL, and number of days into an editable interview preparation kit.
 
-First, run the development server:
+## Stack
+
+- Next.js App Router with TypeScript and route handlers
+- Tailwind CSS
+- MongoDB for users, sessions, kits, and practice records
+- LLM via an env-driven provider switch: local **Ollama** (`qwen3:8b`, free, no key, no rate limits — default) or **OpenRouter** cloud free tier (`z-ai/glm-5.2:free` with automatic fallback models), both through the same retry/failover layer
+- Cheerio and native `fetch` for lightweight retrieval
+
+I kept frontend and backend in one Next.js app to reduce deployment and operational overhead while still keeping retrieval, generation, validation, scheduling, auth, and persistence separated in `src/lib`.
+
+## Setup
+
+```bash
+npm install
+cp .env.example .env
+npm run dev
+```
+
+Required environment variables:
+
+- `LLM_PROVIDER`: `ollama` (local, no key needed) or `openrouter` (cloud). Defaults to `openrouter` when unset.
+- `OLLAMA_MODEL` / `OLLAMA_FALLBACK_MODELS` / `OLLAMA_BASE_URL`: local models and endpoint used when `LLM_PROVIDER=ollama`; defaults `qwen3:8b`, fallback `llama3.2:3b`, `http://127.0.0.1:11434/v1`.
+- `LLM_TIMEOUT_MS`: optional per-request timeout override (defaults: Ollama 180000, OpenRouter 45000).
+- `OPENROUTER_API_KEY`: OpenRouter API key (only needed when `LLM_PROVIDER=openrouter`).
+- `OPENROUTER_MODEL`: model name, defaults to `z-ai/glm-5.2:free` in code.
+- `OPENROUTER_FALLBACK_MODELS`: comma-separated fallback models tried in order when the primary is rate-limited; defaults to `qwen/qwen3.8-27b:free,google/gemma-4-31b-it:free`.
+- `OPENROUTER_SITE_URL`: optional OpenRouter ranking header.
+- `OPENROUTER_SITE_NAME`: optional OpenRouter ranking header.
+- `MONGODB_URI`: MongoDB connection string.
+- `SESSION_SECRET`: documented for deployment secret hygiene; session tokens are random and stored hashed.
+- `ALLOW_PRIVATE_URLS`: set `true` only for trusted/local evaluation environments.
+
+## Batch Entry Point
+
+```bash
+npm run evaluate -- --input cases.json --output kits.json
+```
+
+Input shape:
+
+```json
+[
+  { "id": "case-01", "jd": "Senior Backend Engineer...", "company_url": "http://localhost:8099/acme/", "days": 5 }
+]
+```
+
+Output follows Appendix B with one entry per case. A failed case is recorded without aborting the run.
+
+## Architecture
+
+- `src/lib/pipeline/run.ts`: orchestrates the full kit generation path used by both UI and batch mode.
+- `src/lib/retrieval/company.ts`: validates/fetches company pages, follows relative links, ranks links by about/careers/hiring/interview terms, and records skipped sources.
+- `src/lib/llm/openrouter.ts`: provider-agnostic LLM client (Ollama or OpenRouter selected by `LLM_PROVIDER`), JSON-only prompts, model fallback chain, retries with failover across the chain, deterministic fallback generation when no provider is reachable.
+- `src/lib/pipeline/coverage.ts`: deterministic must-have coverage check.
+- `src/lib/pipeline/schedule.ts`: deterministic schedule allocation.
+- `src/lib/validation/kit.ts`: Appendix A structure validation.
+- `src/app/api/**/route.ts`: route handlers for auth, kits, regeneration, and practice.
+
+## Retrieval Approach
+
+The company URL is validated before fetch. In production, private and loopback hosts are blocked unless `ALLOW_PRIVATE_URLS=true`. Retrieval accepts HTML/text, strips scripts/styles, caps text size, extracts same-host links, ranks likely about/careers/hiring/interview pages, fetches the top few, and records failures as warnings. robots.txt is fetched once per origin and every subpage fetch is checked against it; blocked pages are skipped and logged. Missing hiring pages are not fatal.
+
+Public interview discussion is searched best-effort (DuckDuckGo HTML) for Glassdoor, Reddit, Blind, Levels.fyi, Indeed, and similar sources. Found URLs are recorded in `research_notes`; when the search is blocked, rate-limited, or empty, the kit records that no public discussion source was found instead of fabricating interview-process evidence.
+
+## Generation Sequence
+
+1. Extract role facts and requirements from the JD.
+2. Crawl and clean company pages.
+3. Generate a company brief from retrieved source text.
+4. Generate questions separately for technical, behavioural, system-design, and company-fit categories.
+5. Run deterministic coverage against must-have requirements.
+6. Generate missing questions for uncovered must-have requirements.
+7. Run coverage again, capped at two passes.
+8. Generate flashcards.
+9. Allocate the schedule in code.
+10. Validate the final kit structure before saving or writing output.
+
+The model is not asked to allocate the schedule or decide final coverage.
+
+## Generated, Edited, and Pinned State
+
+Appendix A fields are preserved exactly. Generated records may also carry:
+
+```ts
+meta: { origin: "generated" | "user", edited: boolean, pinned: boolean }
+```
+
+When regenerating a question category, user-created, edited, or pinned items are kept and only unedited generated items are replaced.
+
+## Schedule Allocation
+
+The schedule clamps requested days to `1..60`, creates exactly that many day entries, sorts questions so harder and must-have-linked questions land earlier, then distributes questions round-robin. Durations are integer minutes based on question difficulty.
+
+## Edge Cases
+
+- Invalid or unreachable company URLs produce warnings; a kit can still be generated from the JD.
+- Thin JDs produce thin kits using only present text.
+- Missing hiring pages and missing public discussion are recorded honestly.
+- Invalid or incomplete model JSON falls back to deterministic generation.
+- Provider failures retry (honoring `Retry-After`) across a fallback chain of models, then fall back to deterministic generation, so the batch command remains runnable from a clean clone.
+- Free-tier cloud pools rate-limit aggressively (including per-day account quotas); on busy periods some LLM steps may use the deterministic fallback while others use the model. Local Ollama (`LLM_PROVIDER=ollama`) removes this failure mode entirely — no key, no quota, only hardware speed limits.
+- Duplicate submissions currently create separate kits; deduplication would be added if product requirements demanded it.
+
+## Commands
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run build
+npm run test
+npm run lint
+npm run evaluate -- --input cases.json --output kits.json
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Deployment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The app is a single Next.js app and deploys anywhere Next.js runs (Vercel, Fly.io, Railway, a container, or a VPS with `npm run build && npm start`).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Create a MongoDB Atlas free-tier cluster and copy the connection string.
+2. Create an OpenRouter API key at openrouter.ai (free models are supported) — deployed hosts cannot reach a local Ollama, so set `LLM_PROVIDER=openrouter` in production.
+3. Set the environment variables from `.env.example` in the hosting provider's dashboard:
 
-## Learn More
+   - `MONGODB_URI` — Atlas connection string
+   - `LLM_PROVIDER` — `openrouter` for cloud deployments
+   - `OPENROUTER_API_KEY` — OpenRouter key
+   - `OPENROUTER_MODEL` — optional override, defaults to `z-ai/glm-5.2:free`
+   - `OPENROUTER_FALLBACK_MODELS` — optional fallback chain, defaults to `qwen/qwen3.8-27b:free,google/gemma-4-31b-it:free`
+   - `SESSION_SECRET` — a long random string
+   - `OPENROUTER_SITE_URL` / `OPENROUTER_SITE_NAME` — optional OpenRouter ranking headers
 
-To learn more about Next.js, take a look at the following resources:
+4. Deploy the repo with the provider's Next.js build command (`npm run build`). No extra services are needed; route handlers run inside the same deployment.
+5. After deploy, register an account at `/register` and create a kit from `/dashboard`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The batch command is not part of the deployed app; run it locally or in CI with the same env vars and `npm run evaluate -- --input cases.json --output kits.json`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Timeout-Safe Generation
 
-## Deploy on Vercel
+Creating a kit returns `202` immediately with an id. Generation then continues server-side while each pipeline step persists progress and partial results to the kit document. The kit page polls status, shows the completed-step checklist, and if generation fails it displays the error, any preserved partial results, and a Retry button. Client disconnects or timeouts do not lose work; the dashboard shows `Generating…` / `Failed` states.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Known Limitations
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Generation runs as an in-process background task (fine for a single Node deployment or the evaluator); a queue/worker would be needed for serverless platforms that freeze after the response.
+- Section regeneration recomputes the relevant step live and merges with kept items; no response cache, so repeated regeneration costs tokens.
+- Public discussion search depends on a third-party HTML endpoint and degrades to an honest "no source found" warning when blocked.

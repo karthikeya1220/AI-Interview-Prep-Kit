@@ -1,26 +1,173 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f7f4ec;
+  --surface: #fffdf7;
+  --foreground: #17130d;
+  --ink-soft: #5c5346;
+  --line: #17130d;
+  --ok: #1a7f37;
+  --warn: #b45309;
+  --bad: #b42318;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
   --color-foreground: var(--foreground);
+  --color-ink-soft: var(--ink-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button:not(:disabled):hover {
+  opacity: 0.85;
+}
+
+:focus-visible {
+  outline: 3px solid #f59e0b;
+  outline-offset: 2px;
+}
+
+/* Browser autofill paints a blue field that fights the paper palette. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--surface) inset;
+  -webkit-text-fill-color: var(--foreground);
+  caret-color: var(--foreground);
+}
+
+@layer components {
+  .card {
+    border: 2px solid var(--line);
+    background: var(--surface);
+    border-radius: 16px;
+    box-shadow: 4px 4px 0 var(--line);
+  }
+
+  .card-raised {
+    border: 2px solid var(--line);
+    background: var(--surface);
+    border-radius: 20px;
+    box-shadow: 8px 8px 0 var(--line);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border: 2px solid var(--line);
+    border-radius: 999px;
+    padding: 0.5rem 1.1rem;
+    font-weight: 700;
+    line-height: 1.2;
+    background: var(--surface);
+    color: var(--foreground);
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .btn-solid {
+    background: var(--foreground);
+    color: var(--surface);
+  }
+
+  .btn-sm {
+    padding: 0.25rem 0.7rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+
+  .btn-danger {
+    color: var(--bad);
+  }
+
+  .field {
+    display: block;
+    width: 100%;
+    border: 2px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 0.7rem 0.9rem;
+    color: var(--foreground);
+  }
+
+  .field::placeholder {
+    color: var(--ink-soft);
+    opacity: 0.85;
+  }
+
+  .label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin-bottom: 0.35rem;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 2px solid var(--line);
+    border-radius: 999px;
+    padding: 0.15rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: var(--surface);
+    line-height: 1.4;
+  }
+
+  .chip-solid {
+    background: var(--foreground);
+    color: var(--surface);
+  }
+
+  .chip-ok {
+    background: #dcfce7;
+    color: var(--ok);
+  }
+
+  .chip-warn {
+    background: #fef3c7;
+    color: var(--warn);
+  }
+
+  .chip-bad {
+    background: #fee4e2;
+    color: var(--bad);
+  }
+
+  .section-title {
+    font-size: 1.125rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .page-back {
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
 }
