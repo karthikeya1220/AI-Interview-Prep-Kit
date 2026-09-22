@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "evaluate": "tsx scripts/evaluate.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
