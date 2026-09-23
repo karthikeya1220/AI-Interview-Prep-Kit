@@ -99,7 +99,7 @@ export function NewKitForm() {
         </p>
       ) : null}
 
-      <button className="btn btn-solid mt-6">Generate kit</button>
+      <button className="btn btn-lg btn-solid mt-6">Generate kit</button>
     </form>
   );
 }

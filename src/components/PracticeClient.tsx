@@ -100,7 +100,7 @@ export function PracticeClient({ id }: { id: string }) {
               <p className="mt-2 text-base leading-7 text-white/90">{card.back}</p>
             </div>
           ) : (
-            <button className="btn mt-8" onClick={() => setRevealed(true)}>
+            <button className="btn btn-lg mt-8" onClick={() => setRevealed(true)}>
               Reveal answer
             </button>
           )}

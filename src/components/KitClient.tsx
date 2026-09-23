@@ -210,7 +210,7 @@ export function KitClient({ id }: { id: string }) {
           )}
           <div className="mt-6 flex gap-3">
             <button
-              className="btn btn-solid"
+              className="btn btn-lg btn-solid"
               onClick={async () => {
                 setKitError(null);
                 setStatus("Retrying…");
@@ -282,7 +282,7 @@ export function KitClient({ id }: { id: string }) {
             <p className="text-xs font-bold text-[var(--ink-soft)]">{kit.source.company}</p>
             <h1 className="mt-1 text-2xl font-extrabold leading-snug tracking-tight">{kit.role.title}</h1>
             {kit.source.location ? <p className="mt-1 text-sm text-[var(--ink-soft)]">{kit.source.location}</p> : null}
-            <Link className="btn btn-solid mt-4 w-full" href={`/kits/${id}/practice`}>
+            <Link className="btn btn-lg btn-solid mt-4 w-full" href={`/kits/${id}/practice`}>
               Practice flashcards
             </Link>
           </section>
@@ -367,11 +367,11 @@ export function KitClient({ id }: { id: string }) {
                 {byCategory[category].map((q) => (
                   <article className="card p-4" key={q.id}>
                     <div className="mb-3 flex flex-wrap items-center gap-2">
-                      <button className="btn btn-sm" aria-label="Move question up" onClick={() => moveQuestion(q.id, -1)}>
-                        ↑ Up
+                      <button className="btn btn-sm btn-icon" aria-label="Move question up" onClick={() => moveQuestion(q.id, -1)}>
+                        ↑
                       </button>
-                      <button className="btn btn-sm" aria-label="Move question down" onClick={() => moveQuestion(q.id, 1)}>
-                        ↓ Down
+                      <button className="btn btn-sm btn-icon" aria-label="Move question down" onClick={() => moveQuestion(q.id, 1)}>
+                        ↓
                       </button>
                       <button
                         className="btn btn-sm btn-danger"
@@ -387,7 +387,7 @@ export function KitClient({ id }: { id: string }) {
                         Category
                       </label>
                       <select
-                        className="btn btn-sm"
+                        className="select"
                         id={`cat-${q.id}`}
                         value={q.category}
                         onChange={(e) => updateQuestion(q.id, { category: e.target.value })}

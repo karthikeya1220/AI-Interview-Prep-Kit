@@ -55,7 +55,7 @@ export function DashboardClient() {
         <p className="mt-3 max-w-md text-[var(--ink-soft)]">
           Paste a job description and a company URL to build your first prep plan — questions, flashcards, coverage, and a day-by-day schedule.
         </p>
-        <Link className="btn btn-solid mt-6" href="/kits/new">
+        <Link className="btn btn-lg btn-solid mt-6" href="/kits/new">
           Create your first kit
         </Link>
       </section>

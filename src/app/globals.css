@@ -32,7 +32,7 @@ select {
   font: inherit;
 }
 
-button:not(:disabled):hover {
+button:not(.btn):not(:disabled):hover {
   opacity: 0.85;
 }
 
@@ -73,18 +73,50 @@ textarea:-webkit-autofill {
     gap: 0.4rem;
     border: 2px solid var(--line);
     border-radius: 999px;
-    padding: 0.5rem 1.1rem;
+    padding: 0.5rem 1.15rem;
     font-weight: 700;
     line-height: 1.2;
     background: var(--surface);
     color: var(--foreground);
     cursor: pointer;
     text-align: center;
+    box-shadow: 3px 3px 0 var(--line);
+    transition:
+      transform 0.12s ease,
+      box-shadow 0.12s ease;
+  }
+
+  .btn:not(:disabled):hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 var(--line);
+    opacity: 1;
+  }
+
+  .btn:not(:disabled):active {
+    transform: translate(3px, 3px);
+    box-shadow: 0 0 0 var(--line);
   }
 
   .btn:disabled {
     opacity: 0.55;
     cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+
+  .btn-lg {
+    padding: 0.7rem 1.5rem;
+    font-size: 1rem;
+    box-shadow: 4px 4px 0 var(--line);
+  }
+
+  .btn-lg:not(:disabled):hover {
+    box-shadow: 5px 5px 0 var(--line);
+  }
+
+  .btn-lg:not(:disabled):active {
+    transform: translate(4px, 4px);
+    box-shadow: 0 0 0 var(--line);
   }
 
   .btn-solid {
@@ -93,13 +125,97 @@ textarea:-webkit-autofill {
   }
 
   .btn-sm {
-    padding: 0.25rem 0.7rem;
+    padding: 0.3rem 0.75rem;
     font-size: 0.8125rem;
     font-weight: 600;
+    box-shadow: 2px 2px 0 var(--line);
+  }
+
+  .btn-sm:not(:disabled):hover {
+    box-shadow: 3px 3px 0 var(--line);
+  }
+
+  .btn-sm:not(:disabled):active {
+    transform: translate(2px, 2px);
+    box-shadow: 0 0 0 var(--line);
+  }
+
+  .btn-icon {
+    padding: 0.3rem 0.55rem;
+    min-width: 2rem;
+    box-shadow: 2px 2px 0 var(--line);
+  }
+
+  .btn-icon:not(:disabled):hover {
+    box-shadow: 3px 3px 0 var(--line);
+  }
+
+  .btn-icon:not(:disabled):active {
+    transform: translate(2px, 2px);
+    box-shadow: 0 0 0 var(--line);
   }
 
   .btn-danger {
     color: var(--bad);
+    border-color: var(--bad);
+    background: #fee4e2;
+    box-shadow: 3px 3px 0 var(--bad);
+  }
+
+  .btn-danger:not(:disabled):hover {
+    box-shadow: 4px 4px 0 var(--bad);
+  }
+
+  .btn-danger:not(:disabled):active {
+    box-shadow: 0 0 0 var(--bad);
+  }
+
+  .btn-danger.btn-sm,
+  .btn-danger.btn-icon {
+    box-shadow: 2px 2px 0 var(--bad);
+  }
+
+  .btn-danger.btn-sm:not(:disabled):hover,
+  .btn-danger.btn-icon:not(:disabled):hover {
+    box-shadow: 3px 3px 0 var(--bad);
+  }
+
+  .btn-danger.btn-sm:not(:disabled):active,
+  .btn-danger.btn-icon:not(:disabled):active {
+    box-shadow: 0 0 0 var(--bad);
+  }
+
+  .select {
+    display: inline-flex;
+    align-items: center;
+    border: 2px solid var(--line);
+    border-radius: 10px;
+    background-color: var(--surface);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2317130d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.55rem center;
+    background-size: 0.6rem;
+    appearance: none;
+    color: var(--foreground);
+    padding: 0.3rem 1.7rem 0.3rem 0.6rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.3;
+    cursor: pointer;
+    box-shadow: 2px 2px 0 var(--line);
+    transition:
+      transform 0.12s ease,
+      box-shadow 0.12s ease;
+  }
+
+  .select:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 var(--line);
+  }
+
+  .select:active {
+    transform: translate(2px, 2px);
+    box-shadow: 0 0 0 var(--line);
   }
 
   .field {

@@ -21,10 +21,10 @@ export default function Home() {
             Paste a job description, give the company URL, and generate a structured kit with research notes, questions, flashcards, coverage checks, and an exact-day study schedule.
           </p>
           <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-            <Link className="btn btn-solid" href="/register">
+            <Link className="btn btn-lg btn-solid" href="/register">
               Create account
             </Link>
-            <Link className="btn" href="/login">
+            <Link className="btn btn-lg" href="/login">
               Log in
             </Link>
           </div>

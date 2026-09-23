@@ -64,7 +64,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           {error}
         </p>
       ) : null}
-      <button className="btn btn-solid w-full" disabled={loading}>
+      <button className="btn btn-lg btn-solid w-full" disabled={loading}>
         {loading ? "Working…" : mode === "login" ? "Log in" : "Create account"}
       </button>
     </form>
