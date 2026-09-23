@@ -13,8 +13,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Interview Prep Kit",
-  description: "Generate, edit, and practice interview preparation kits.",
+  title: {
+    default: "Prep Kit — AI Interview Prep Kit",
+    template: "%s",
+  },
+  description:
+    "Turn a job posting into an editable prep kit: company research, questions, flashcards, coverage checks, and an exact-day study schedule.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
