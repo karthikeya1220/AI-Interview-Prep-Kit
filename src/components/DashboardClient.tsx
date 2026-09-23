@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { hostnameOf } from "@/lib/ui";
+import { hostnameOf, monogram } from "@/lib/ui";
 
 type KitSummary = {
   _id: string;
@@ -19,7 +19,7 @@ type KitSummary = {
 
 function statusChip(status?: string) {
   if (status === "failed") return <span className="chip chip-bad">Failed · open to retry</span>;
-  if (status === "generating") return <span className="chip chip-warn">Generating…</span>;
+  if (status === "generating") return <span className="chip chip-warn chip-pulse">Generating…</span>;
   return <span className="chip chip-ok">Ready</span>;
 }
 
@@ -42,8 +42,21 @@ export function DashboardClient() {
 
   if (loading) {
     return (
-      <div className="card p-8" role="status">
-        Loading kits…
+      <div className="grid gap-4 md:grid-cols-2" role="status" aria-label="Loading kits">
+        <span className="sr-only">Loading kits…</span>
+        {[0, 1].map((i) => (
+          <div className="card p-5" key={i} aria-hidden>
+            <div className="flex gap-3">
+              <div className="sk h-11 w-11 shrink-0 !rounded-xl" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="sk h-5 w-3/4" />
+                <div className="sk h-4 w-1/2" />
+              </div>
+              <div className="sk h-6 w-16 shrink-0 !rounded-full" />
+            </div>
+            <div className="sk mt-6 h-4 w-2/5" />
+          </div>
+        ))}
       </div>
     );
   }
@@ -70,11 +83,16 @@ export function DashboardClient() {
         const uncovered = doc.kit?.coverage?.uncovered_requirement_ids?.length ?? 0;
         return (
           <li key={doc._id}>
-            <Link className="card flex h-full flex-col gap-3 p-5 transition-transform hover:-translate-y-0.5" href={`/kits/${doc._id}`}>
+            <Link className="card card-hover flex h-full flex-col gap-3 p-5" href={`/kits/${doc._id}`}>
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-lg font-extrabold leading-snug tracking-tight">{title}</p>
-                  <p className="mt-1 truncate text-sm text-[var(--ink-soft)]">{company || doc.input?.company_url}</p>
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="monogram" aria-hidden>
+                    {monogram(company || title)}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-lg font-extrabold leading-snug tracking-tight">{title}</p>
+                    <p className="mt-1 truncate text-sm text-[var(--ink-soft)]">{company || doc.input?.company_url}</p>
+                  </div>
                 </div>
                 {statusChip(doc.status)}
               </div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { PIPELINE_STEPS, type Kit, type PartialKit, type QuestionCategory } from "@/lib/types";
 import { categoryLabel, difficultyDots } from "@/lib/ui";
@@ -43,7 +43,21 @@ export function KitClient({ id }: { id: string }) {
   const [progress, setProgress] = useState<string[]>([]);
   const [kitError, setKitError] = useState<KitError>(null);
   const [partial, setPartial] = useState<PartialKit | null>(null);
+  const [toast, setToast] = useState<{ id: number; msg: string; bad?: boolean } | null>(null);
+  const toastSeq = useRef(0);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const polling = docStatus === "loading" || docStatus === "generating";
+
+  function notify(msg: string, bad = false) {
+    toastSeq.current += 1;
+    setToast({ id: toastSeq.current, msg, bad });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2600);
+  }
+
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
 
   useEffect(() => {
     if (!polling) return;
@@ -85,15 +99,14 @@ export function KitClient({ id }: { id: string }) {
 
   async function save(nextKit = kit) {
     if (!nextKit) return;
-    setStatus("Saving…");
-    await fetch(`/api/kits/${id}`, {
+    const res = await fetch(`/api/kits/${id}`, {
       method: "PATCH",
       body: JSON.stringify({ kit: nextKit }),
       headers: { "content-type": "application/json" },
     });
     setDirty(false);
-    setStatus("Saved");
-    setTimeout(() => setStatus(""), 1200);
+    if (res.ok) notify("Changes saved");
+    else notify("Save failed", true);
   }
 
   function updateQuestion(qid: string, patch: Record<string, unknown>) {
@@ -143,7 +156,6 @@ export function KitClient({ id }: { id: string }) {
   }
 
   async function regenerate(section: string, category?: QuestionCategory) {
-    setStatus("Regenerating section without touching edited or pinned items…");
     const res = await fetch(`/api/kits/${id}/regenerate`, {
       method: "POST",
       body: JSON.stringify({ section, category }),
@@ -151,8 +163,8 @@ export function KitClient({ id }: { id: string }) {
     });
     const data = await res.json();
     if (data.kit) setKit(data.kit);
-    setStatus(res.ok ? "Regenerated" : data.error?.message || "Regeneration failed");
-    setTimeout(() => setStatus(""), 1600);
+    if (res.ok) notify("Section regenerated");
+    else notify(data.error?.message || "Regeneration failed", true);
   }
 
   if (docStatus === "generating" || docStatus === "loading") {
@@ -163,24 +175,45 @@ export function KitClient({ id }: { id: string }) {
           <h1 className="text-3xl font-extrabold tracking-tight">Generating your kit…</h1>
           <p className="mt-3 text-[var(--ink-soft)]">Each step is saved as it finishes. You can leave this page and come back later.</p>
           <ol className="mt-6 space-y-3">
-            {PIPELINE_STEPS.map((step) => {
-              const done = progress.includes(step);
-              return (
-                <li className="flex items-center gap-3 text-base" key={step}>
-                  <span
-                    className={`inline-flex h-7 w-7 items-center justify-center rounded-md border-2 border-[var(--line)] text-sm font-bold ${
-                      done ? "bg-[var(--foreground)] text-[var(--surface)]" : "bg-[var(--surface)]"
-                    }`}
-                    aria-hidden
-                  >
-                    {done ? "✓" : ""}
-                  </span>
-                  <span className={done ? "" : "text-[var(--ink-soft)]"}>{step}</span>
-                  {done ? <span className="sr-only">done</span> : <span className="sr-only">pending</span>}
-                </li>
-              );
-            })}
+            {(() => {
+              const firstPending = PIPELINE_STEPS.find((step) => !progress.includes(step));
+              return PIPELINE_STEPS.map((step) => {
+                const done = progress.includes(step);
+                return (
+                  <li className="flex items-center gap-3 text-base" key={step}>
+                    <span
+                      className={`inline-flex h-7 w-7 items-center justify-center rounded-md border-2 border-[var(--line)] text-sm font-bold ${
+                        done ? "bg-[var(--foreground)] text-[var(--surface)]" : "bg-[var(--surface)]"
+                      } ${!done && step === firstPending ? "pulse" : ""}`}
+                      aria-hidden
+                    >
+                      {done ? "✓" : ""}
+                    </span>
+                    <span className={done ? "" : "text-[var(--ink-soft)]"}>{step}</span>
+                    {done ? <span className="sr-only">done</span> : <span className="sr-only">pending</span>}
+                  </li>
+                );
+              });
+            })()}
           </ol>
+          <div className="mt-6">
+            <div className="mb-2 flex items-center justify-between text-xs font-bold text-[var(--ink-soft)]">
+              <span>Progress</span>
+              <span>
+                {progress.length}/{PIPELINE_STEPS.length}
+              </span>
+            </div>
+            <div
+              className="progress"
+              role="progressbar"
+              aria-valuenow={Math.round((progress.length / PIPELINE_STEPS.length) * 100)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Generation progress"
+            >
+              <div className="progress-fill" style={{ width: `${(progress.length / PIPELINE_STEPS.length) * 100}%` }} />
+            </div>
+          </div>
         </section>
       </>
     );
@@ -192,7 +225,7 @@ export function KitClient({ id }: { id: string }) {
         <AppHeader action={<Link className="page-back" href="/dashboard">Back to dashboard</Link>} />
         <section className="card-raised mx-auto max-w-2xl p-8">
           <h1 className="text-3xl font-extrabold tracking-tight">Generation failed</h1>
-          <p className="mt-4 rounded-xl border-2 border-[var(--bad)] bg-red-50 p-3 text-[var(--bad)]" role="alert">
+          <p className="notice notice-bad mt-4" role="alert">
             {kitError?.message || "Something went wrong while generating this kit."}
           </p>
           {partial ? (
@@ -263,11 +296,6 @@ export function KitClient({ id }: { id: string }) {
             <Link className="btn btn-sm" href={`/kits/${id}/practice`}>
               Practice
             </Link>
-            {status ? (
-              <span className="chip" role="status">
-                {status}
-              </span>
-            ) : null}
           </div>
         }
       />
@@ -463,6 +491,12 @@ export function KitClient({ id }: { id: string }) {
           </section>
         </section>
       </div>
+
+      {toast ? (
+        <div className={`toast${toast.bad ? " toast-bad" : ""}`} key={toast.id} role="status">
+          {toast.msg}
+        </div>
+      ) : null}
     </>
   );
 }

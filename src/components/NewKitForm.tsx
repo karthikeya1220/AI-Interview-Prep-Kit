@@ -11,8 +11,23 @@ export function NewKitForm() {
 
   async function submit(formData: FormData) {
     setError("");
-    setStatus("Creating kit… generation continues in the background.");
     const payload = Object.fromEntries(formData);
+    try {
+      new URL(String(payload.company_url || ""));
+    } catch {
+      setError("Enter a full company URL, like https://company.com.");
+      return;
+    }
+    const days = Number(payload.days);
+    if (!Number.isInteger(days) || days < 1 || days > 60) {
+      setError("Days until interview must be a whole number between 1 and 60.");
+      return;
+    }
+    if (String(payload.jd || "").trim().length < 40) {
+      setError("Paste the full job description — at least 40 characters.");
+      return;
+    }
+    setStatus("Creating kit… generation continues in the background.");
     const res = await fetch("/api/kits", {
       method: "POST",
       body: JSON.stringify(payload),
@@ -28,7 +43,7 @@ export function NewKitForm() {
   }
 
   return (
-    <form action={submit} className="card-raised p-6 md:p-8">
+    <form action={submit} noValidate className="card-raised p-6 md:p-8">
       <h1 className="text-3xl font-extrabold tracking-tight">Create kit</h1>
       <p className="mt-2 max-w-xl text-sm text-[var(--ink-soft)]">
         We extract requirements, crawl the company site (robots.txt respected), then generate questions, flashcards, coverage, and an exact-day schedule.
@@ -89,12 +104,12 @@ export function NewKitForm() {
       </div>
 
       {status ? (
-        <p className="mt-5 rounded-xl border-2 border-amber-700 bg-amber-50 p-3 text-sm text-amber-900" role="status">
+        <p className="notice notice-warn mt-5" role="status">
           {status}
         </p>
       ) : null}
       {error ? (
-        <p className="mt-5 rounded-xl border-2 border-[var(--bad)] bg-red-50 p-3 text-sm text-[var(--bad)]" role="alert">
+        <p className="notice notice-bad mt-5" role="alert">
           {error}
         </p>
       ) : null}

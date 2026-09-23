@@ -28,6 +28,31 @@ export default function Home() {
               Log in
             </Link>
           </div>
+
+          <div className="card mt-10 max-w-md p-4" aria-hidden>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-[var(--ink-soft)]">Coverage</span>
+              <span className="chip chip-ok">Clear</span>
+            </div>
+            <div className="mt-2 h-3 overflow-hidden rounded-full border-2 border-[var(--line)] bg-[var(--background)]">
+              <div className="h-full w-full bg-[var(--foreground)]" />
+            </div>
+            <div className="mt-4 flex items-center gap-2">
+              {[1, 2, 3].map((d) => (
+                <span
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[var(--foreground)] text-xs font-extrabold text-[var(--surface)]"
+                  key={d}
+                >
+                  {d}
+                </span>
+              ))}
+              <span className="text-xs font-semibold text-[var(--ink-soft)]">exact-day schedule</span>
+            </div>
+            <div className="mt-4 space-y-2 border-t-2 border-[var(--line)] pt-3">
+              <div className="h-3 w-full rounded-full bg-[#e9e3d6]" />
+              <div className="h-3 w-5/6 rounded-full bg-[#e9e3d6]" />
+            </div>
+          </div>
         </div>
 
         <div className="rounded-2xl bg-[var(--foreground)] p-6 text-[var(--surface)]">
