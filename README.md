@@ -22,7 +22,7 @@ npm run dev
 
 Required environment variables:
 
-- `LLM_PROVIDER`: `ollama` (local, no key needed) or `openrouter` (cloud). Defaults to `openrouter` when unset.
+- `LLM_PROVIDER`: `ollama` (local, no key needed) or `openrouter` (cloud). Defaults to `openrouter` when unset; `.env.example` ships with `ollama` so a clean clone runs without a key.
 - `OLLAMA_MODEL` / `OLLAMA_FALLBACK_MODELS` / `OLLAMA_BASE_URL`: local models and endpoint used when `LLM_PROVIDER=ollama`; defaults `qwen3:8b`, fallback `llama3.2:3b`, `http://127.0.0.1:11434/v1`.
 - `LLM_TIMEOUT_MS`: optional per-request timeout override (defaults: Ollama 180000, OpenRouter 45000).
 - `OPENROUTER_API_KEY`: OpenRouter API key (only needed when `LLM_PROVIDER=openrouter`).
@@ -74,7 +74,7 @@ Public interview discussion is searched best-effort (DuckDuckGo HTML) for Glassd
 4. Generate questions separately for technical, behavioural, system-design, and company-fit categories.
 5. Run deterministic coverage against must-have requirements.
 6. Generate missing questions for uncovered must-have requirements.
-7. Run coverage again, capped at two passes.
+7. Run coverage again, capped at two passes; a final deterministic sweep still adds a question for any open must-have so kits never ship with uncovered must-haves.
 8. Generate flashcards.
 9. Allocate the schedule in code.
 10. Validate the final kit structure before saving or writing output.
@@ -101,10 +101,30 @@ The kit sidebar includes a **Weak spots** card (`src/lib/kit/weakSpots.ts`). It 
 
 The problem it solves: coverage and practice confidence lived in two different places, so a candidate could see "Coverage clear" and still not know what to spend the next 30 minutes on. The report answers that question in one list, worst first, with a direct link into practice.
 
+## Practice ordering choice
+
+Practice uses a simple confidence-weighted sort: cards rated lower appear first on the next session (ascending by stored confidence, unpractised = 0). We chose this over spaced-repetition intervals because the assessment only needs a defensible “least confident first” rule, scores are already 1–5, and a full SM-2 schedule would need review dates the product does not collect. It is one sort, stable, and easy to explain in a walkthrough.
+
+## Batch budget (5 cases / 15 minutes)
+
+`scripts/evaluate.ts` runs cases with concurrency 2. Free-tier LLM pools rate-limit on tokens-per-minute; two workers keep wall time under the 15-minute budget for five cases while avoiding 429 storms. Each case has its own timeout/fallback chain, and a failed case is recorded without aborting the run.
+
+## Walkthrough video shot list (3–4 minutes)
+
+1. **Create a kit end to end** (~60s) — register/login, paste JD + company URL + days, open the generating checklist.
+2. **Research & second pass** (~45s) — show crawl steps, coverage meter, and a must-have that was open then closed after the gap pass (`coverage.passes`).
+3. **Edit / reorder / regenerate** (~45s) — edit a question, pin it, regenerate that category; pin/edited items survive.
+4. **Practice + schedule** (~45s) — reveal a card, rate 1–5, show least-confident-first order and the day-by-day schedule.
+5. **Weak spots + one design decision** (~45s) — Weak spots card; defend deterministic schedule/coverage (never the model).
+
+## Public discussion sources
+
+Best-effort DuckDuckGo HTML search prioritises Glassdoor, Reddit, Blind, Levels.fyi, Indeed, CareerCup, and interview-tagged Stack Overflow. Found URLs are recorded in `research_notes`; the top discussion pages are fetched (when reachable) and fed into company-fit question context. Blocked or empty search is reported honestly, never fabricated.
+
 ## Edge Cases
 
 - Invalid or unreachable company URLs produce warnings; a kit can still be generated from the JD.
-- Thin JDs produce thin kits using only present text.
+- Thin JDs produce thin kits using only present text (UI accepts short stubs; no minimum character floor beyond non-empty).
 - Missing hiring pages and missing public discussion are recorded honestly.
 - Invalid or incomplete model JSON falls back to deterministic generation.
 - Provider failures retry (honoring `Retry-After`) across a fallback chain of models, then fall back to deterministic generation, so the batch command remains runnable from a clean clone.
@@ -123,6 +143,8 @@ npm run evaluate -- --input cases.json --output kits.json
 ```
 
 ## Deployment
+
+**Live URL:** _deploy and paste the public URL here before submitting._
 
 The app is a single Next.js app and deploys anywhere Next.js runs (Vercel, Fly.io, Railway, a container, or a VPS with `npm run build && npm start`).
 

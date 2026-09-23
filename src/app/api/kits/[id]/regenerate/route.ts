@@ -33,6 +33,7 @@ export async function POST(request: Request, context: Context) {
     const doc = await database.collection("kits").findOne({ _id: new ObjectId(id), userId });
     if (!doc) return json({ error: { message: "Kit not found." } }, 404);
     const kit = doc.kit;
+    if (!kit) return json({ error: { message: "Kit is not ready yet — wait for generation to finish." } }, 409);
     const input = doc.input || { jd: "", company_url: kit.source?.company_url || "", days: kit.schedule?.days_available || 1 };
     const requirements = kit.role.requirements;
 
@@ -60,9 +61,9 @@ export async function POST(request: Request, context: Context) {
       const fresh = await generateQuestionsStep(requirements, kit.source.company, context, [category], kept.length);
       const taken = new Set<string>(kept.map((q) => q.id));
       const merged = kept.concat(fresh.map((q) => ({ ...q, id: withUniqueId(q, taken) })));
-      const { questions, uncovered } = await ensureCoverageStep(requirements, merged);
+      const { questions, uncovered, passes } = await ensureCoverageStep(requirements, merged);
       kit.questions = questions;
-      kit.coverage = { uncovered_requirement_ids: uncovered, passes: uncovered.length ? 2 : kit.coverage?.passes || 1 };
+      kit.coverage = { uncovered_requirement_ids: uncovered, passes: Math.max(passes, kit.coverage?.passes || 1) };
       // The schedule references question ids, so it must be rebuilt whenever questions change.
       kit.schedule = buildSchedule({ role: kit.role, questions: kit.questions }, input.days);
     }

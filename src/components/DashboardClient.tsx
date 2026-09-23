@@ -27,17 +27,28 @@ export function DashboardClient() {
   const router = useRouter();
   const [kits, setKits] = useState<KitSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    fetch("/api/kits").then(async (res) => {
-      if (res.status === 401) {
-        router.push("/login");
-        return;
-      }
-      const data = await res.json();
-      setKits(data.kits || []);
-      setLoading(false);
-    });
+    fetch("/api/kits")
+      .then(async (res) => {
+        if (res.status === 401) {
+          router.push("/login");
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setLoadError(data.error?.message || "Could not load kits.");
+          setLoading(false);
+          return;
+        }
+        setKits(data.kits || []);
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoadError("Network error while loading kits. Refresh to retry.");
+        setLoading(false);
+      });
   }, [router]);
 
   if (loading) {
@@ -58,6 +69,18 @@ export function DashboardClient() {
           </div>
         ))}
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <section className="card-raised p-8" role="alert">
+        <h1 className="text-2xl font-extrabold tracking-tight">Could not load kits</h1>
+        <p className="notice notice-bad mt-4">{loadError}</p>
+        <button className="btn btn-solid mt-6" onClick={() => window.location.reload()} type="button">
+          Retry
+        </button>
+      </section>
     );
   }
 

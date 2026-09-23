@@ -3,6 +3,7 @@ import { researchCompany, type ResearchPage } from "@/lib/retrieval/company";
 import type { Flashcard, Kit, PipelineInput, Question, QuestionCategory, Requirement } from "@/lib/types";
 import { validateKit } from "@/lib/validation/kit";
 import { checkCoverage } from "./coverage";
+import { closeMustHaveGaps, gapQuestionFor } from "./closeGaps";
 import { extractRoleHeuristics } from "./extractRequirements";
 import { buildSchedule } from "./schedule";
 
@@ -186,27 +187,50 @@ export async function generateQuestionsStep(requirements: Requirement[], company
   return batches.flat().map((q, i) => ({ ...q, id: `q${offset + i + 1}` }));
 }
 
-/** Gap pass: generate questions for uncovered must-have requirements, then re-check. */
-export async function ensureCoverageStep(requirements: Requirement[], questions: Question[]): Promise<{ questions: Question[]; uncovered: string[] }> {
-  const uncovered = checkCoverage(requirements, questions);
-  if (!uncovered.length) return { questions, uncovered };
-  const missing = requirements.filter((r) => uncovered.includes(r.id));
+/**
+ * Gap pass: generate questions for uncovered must-have requirements, then re-check.
+ * Always finishes with a deterministic sweep so no must-have can remain uncovered.
+ * `passes` is how many coverage checks actually ran (1 = clear on first check, 2 = gap pass ran).
+ */
+export async function ensureCoverageStep(
+  requirements: Requirement[],
+  questions: Question[],
+): Promise<{ questions: Question[]; uncovered: string[]; passes: number }> {
+  const first = checkCoverage(requirements, questions);
+  if (!first.length) return { questions, uncovered: first, passes: 1 };
+
+  const missing = requirements.filter((r) => first.includes(r.id));
   const start = questions.length;
   const generated = await jsonCompletion<{ questions: Omit<Question, "id" | "meta">[] }>(
-    "Generate missing interview questions. Each missing must-have requirement needs at least one question referencing its id.",
+    "Generate missing interview questions. Each missing must-have requirement needs at least one question referencing its id. Match category to requirement kind: behavioural → behavioural, domain → company-fit, technical → technical.",
     `Missing requirements: ${JSON.stringify(missing)}\nReturn {"questions":[{"requirement_ids":["r1"],"category":"technical","prompt":"","answer_outline":"","difficulty":2}]}`,
-    () => ({ questions: fallbackQuestions(missing, "technical", start) }),
+    () => ({
+      questions: missing.map((r) => {
+        const q = gapQuestionFor(r, `q${start + 1}`);
+        return { requirement_ids: q.requirement_ids, category: q.category, prompt: q.prompt, answer_outline: q.answer_outline, difficulty: q.difficulty };
+      }),
+    }),
   );
 
-  const raw = (generated.questions || []).length ? generated.questions : [];
+  const raw = generated.questions || [];
   const normalized = raw
-    .map((q: RawQuestion) => normalizeQuestions({ questions: [q] }, (["technical", "behavioural", "system-design", "company-fit"].includes(String(q.category)) ? String(q.category) : "technical") as QuestionCategory)[0])
+    .map((q: RawQuestion) =>
+      normalizeQuestions(
+        { questions: [q] },
+        (["technical", "behavioural", "system-design", "company-fit"].includes(String(q.category))
+          ? String(q.category)
+          : "technical") as QuestionCategory,
+      )[0],
+    )
     .filter((q): q is Question => Boolean(q));
-  // If the model produced nothing usable for the gap pass, close the gap deterministically.
-  const source = normalized.length ? normalized : fallbackQuestions(missing, "technical", start);
+  const source = normalized.length
+    ? normalized
+    : missing.map((r) => gapQuestionFor(r, `q${start + 1}`));
   const gaps = source.map((q, i) => ({ ...q, id: `q${start + i + 1}` })) as Question[];
-  const merged = questions.concat(gaps);
-  return { questions: merged, uncovered: checkCoverage(requirements, merged) };
+  let merged = questions.concat(gaps);
+  // Deterministic close: model omissions or wrong-kind filters must not leave must-haves open.
+  merged = merged.concat(closeMustHaveGaps(requirements, merged));
+  return { questions: merged, uncovered: checkCoverage(requirements, merged), passes: 2 };
 }
 
 /** Retrieval + company brief, reused by full runs and section regeneration. */
@@ -269,7 +293,7 @@ export async function runPipeline(input: PipelineInput, onStep?: PipelineStep) {
   await step("questions", { questions });
   const coverage = await ensureCoverageStep(role.requirements, questions);
   questions = coverage.questions;
-  await step("coverage check", { coverage: { uncovered_requirement_ids: coverage.uncovered, passes: coverage.uncovered.length ? 2 : 1 } });
+  await step("coverage check", { coverage: { uncovered_requirement_ids: coverage.uncovered, passes: coverage.passes } });
   const flashcards = await generateFlashcardsStep(role.requirements);
   await step("flashcards", { flashcards });
   const schedule = buildSchedule({ role, questions }, input.days);
@@ -281,7 +305,7 @@ export async function runPipeline(input: PipelineInput, onStep?: PipelineStep) {
     questions,
     flashcards,
     schedule,
-    coverage: { uncovered_requirement_ids: coverage.uncovered, passes: coverage.uncovered.length ? 2 : 1 },
+    coverage: { uncovered_requirement_ids: coverage.uncovered, passes: coverage.passes },
     research_notes: research.warnings,
   };
   const valid = validateKit(kit);

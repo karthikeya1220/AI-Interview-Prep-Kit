@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import type { Kit } from "@/lib/types";
@@ -16,25 +17,56 @@ const scale = [
 ];
 
 export function PracticeClient({ id }: { id: string }) {
+  const router = useRouter();
   const [kit, setKit] = useState<Kit | null>(null);
   const [records, setRecords] = useState<Record<string, number>>({});
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [filed, setFiled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
     Promise.all([
-      fetch(`/api/kits/${id}`).then((r) => r.json()),
-      fetch(`/api/kits/${id}/practice`).then((r) => r.json()),
-    ]).then(([kitData, practiceData]) => {
-      setKit(kitData.kit);
-      setRecords(
-        Object.fromEntries(
-          ((practiceData.records || []) as PracticeRecord[]).map((r) => [r.flashcardId, r.confidence]),
-        ),
-      );
-    });
-  }, [id]);
+      fetch(`/api/kits/${id}`).then(async (r) => {
+        if (r.status === 401) return { status: 401 as const, data: {} };
+        const data = await r.json().catch(() => ({}));
+        return { status: r.status, data };
+      }),
+      fetch(`/api/kits/${id}/practice`).then(async (r) => {
+        if (r.status === 401) return { status: 401 as const, data: {} };
+        const data = await r.json().catch(() => ({}));
+        return { status: r.status, data };
+      }),
+    ])
+      .then(([kitRes, practiceRes]) => {
+        if (cancelled) return;
+        if (kitRes.status === 401 || practiceRes.status === 401) {
+          router.push("/login");
+          return;
+        }
+        if (kitRes.status !== 200) {
+          setLoadError(kitRes.data?.error?.message || "Could not load this kit.");
+          return;
+        }
+        setKit(kitRes.data.kit);
+        setRecords(
+          Object.fromEntries(
+            ((practiceRes.data.records || []) as PracticeRecord[]).map((r) => [r.flashcardId, r.confidence]),
+          ),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError("Network error while loading practice. Check your connection and retry.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, router]);
 
   const cards = kit ? [...kit.flashcards].sort((a, b) => (records[a.id] || 0) - (records[b.id] || 0)) : [];
   const card = cards[index] || cards[0] || null;
@@ -52,7 +84,7 @@ export function PracticeClient({ id }: { id: string }) {
       method: "POST",
       body: JSON.stringify({ flashcardId: card.id, confidence }),
       headers: { "content-type": "application/json" },
-    });
+    }).catch(() => {});
     setRevealed(false);
     setFiled(true);
     setIndex((index + 1) % cards.length);
@@ -78,7 +110,7 @@ export function PracticeClient({ id }: { id: string }) {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  if (!kit) {
+  if (loading) {
     return (
       <>
         <AppHeader action={<Link className="page-back" href={`/kits/${id}`}>Back to kit</Link>} />
@@ -104,6 +136,36 @@ export function PracticeClient({ id }: { id: string }) {
     );
   }
 
+  if (loadError) {
+    return (
+      <>
+        <AppHeader action={<Link className="page-back" href={`/kits/${id}`}>Back to kit</Link>} />
+        <section className="card-raised mx-auto max-w-lg p-8" role="alert">
+          <h1 className="text-2xl font-extrabold tracking-tight">Practice unavailable</h1>
+          <p className="notice notice-bad mt-4">{loadError}</p>
+          <button className="btn btn-lg btn-solid mt-6" onClick={() => window.location.reload()} type="button">
+            Try again
+          </button>
+        </section>
+      </>
+    );
+  }
+
+  if (!kit) {
+    return (
+      <>
+        <AppHeader action={<Link className="page-back" href={`/kits/${id}`}>Back to kit</Link>} />
+        <section className="card-raised mx-auto max-w-lg p-8">
+          <h1 className="text-2xl font-extrabold">Kit not ready</h1>
+          <p className="mt-2 text-[var(--ink-soft)]">This kit has no content yet. Open it from the dashboard once generation finishes.</p>
+          <Link className="btn btn-lg btn-solid mt-6" href="/dashboard">
+            Back to dashboard
+          </Link>
+        </section>
+      </>
+    );
+  }
+
   if (!card) {
     return (
       <>
@@ -116,7 +178,8 @@ export function PracticeClient({ id }: { id: string }) {
     );
   }
 
-  const covered = Object.keys(records).length;
+  const cardIds = new Set(cards.map((c) => c.id));
+  const covered = Object.keys(records).filter((key) => cardIds.has(key)).length;
   const pct = cards.length ? Math.round((covered / cards.length) * 100) : 0;
   const position = (index % cards.length) + 1;
 

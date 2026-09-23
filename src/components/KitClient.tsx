@@ -118,16 +118,25 @@ export function KitClient({ id }: { id: string }) {
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
 
-  async function save(nextKit = kit) {
-    if (!nextKit) return;
-    const res = await fetch(`/api/kits/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ kit: nextKit }),
-      headers: { "content-type": "application/json" },
-    });
-    setDirty(false);
-    if (res.ok) notify("Changes saved");
-    else notify("Save failed", true);
+  async function save(nextKit = kit): Promise<boolean> {
+    if (!nextKit) return false;
+    try {
+      const res = await fetch(`/api/kits/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ kit: nextKit }),
+        headers: { "content-type": "application/json" },
+      });
+      if (res.ok) {
+        setDirty(false);
+        notify("Changes saved");
+        return true;
+      }
+      notify("Save failed", true);
+      return false;
+    } catch {
+      notify("Save failed", true);
+      return false;
+    }
   }
 
   function updateQuestion(qid: string, patch: Record<string, unknown>) {
@@ -209,15 +218,43 @@ export function KitClient({ id }: { id: string }) {
   }
 
   async function regenerate(section: string, category?: QuestionCategory) {
+    // Flush in-flight edits first so regeneration never clobbers unsaved work.
+    if (dirty && kit) {
+      const saved = await save(kit);
+      if (!saved) {
+        notify("Save your changes before regenerating", true);
+        return;
+      }
+    }
     const res = await fetch(`/api/kits/${id}/regenerate`, {
       method: "POST",
       body: JSON.stringify({ section, category }),
       headers: { "content-type": "application/json" },
     });
-    const data = await res.json();
-    if (data.kit) setKit(data.kit);
+    const data = await res.json().catch(() => ({}));
+    if (data.kit) {
+      setKit(data.kit);
+      setDirty(false);
+    }
     if (res.ok) notify("Section regenerated");
     else notify(data.error?.message || "Regeneration failed", true);
+  }
+
+  function togglePin(qid: string) {
+    if (!kit) return;
+    const next = {
+      ...kit,
+      questions: kit.questions.map((q) =>
+        q.id === qid ? { ...q, meta: { ...q.meta, origin: q.meta?.origin || "generated", pinned: !q.meta?.pinned } } : q,
+      ),
+    };
+    setKit(next);
+    setDirty(true);
+  }
+
+  function leaveKit(href: string) {
+    if (dirty && !window.confirm("You have unsaved changes. Leave anyway?")) return;
+    router.push(href);
   }
 
   if (docStatus === "generating" || docStatus === "loading") {
@@ -356,7 +393,7 @@ export function KitClient({ id }: { id: string }) {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(260px,0.7fr)_minmax(0,1.3fr)]">
         <aside className="space-y-4">
-          <Link className="page-back inline-block" href="/dashboard">
+          <Link className="page-back inline-block" href="/dashboard" onClick={(e) => { if (dirty) { e.preventDefault(); leaveKit("/dashboard"); } }}>
             Back to dashboard
           </Link>
 
@@ -517,7 +554,14 @@ export function KitClient({ id }: { id: string }) {
                       <span className="chip ml-auto" title="Difficulty">
                         {difficultyDots(q.difficulty)}
                       </span>
-                      {q.meta?.pinned ? <span className="chip chip-solid">Pinned</span> : null}
+                      <button
+                        className="btn btn-sm"
+                        aria-label={q.meta?.pinned ? "Unpin question" : "Pin question"}
+                        title={q.meta?.pinned ? "Unpin (regeneration may replace unpinned items)" : "Pin so regeneration always keeps this"}
+                        onClick={() => togglePin(q.id)}
+                      >
+                        {q.meta?.pinned ? "Pinned" : "Pin"}
+                      </button>
                       {q.meta?.edited ? <span className="chip">Edited</span> : null}
                     </div>
 
