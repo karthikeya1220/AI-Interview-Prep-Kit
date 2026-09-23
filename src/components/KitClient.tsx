@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
-import { PIPELINE_STEPS, type Kit, type PartialKit, type QuestionCategory } from "@/lib/types";
+import { computeWeakSpots } from "@/lib/kit/weakSpots";
+import { PIPELINE_STEPS, type Flashcard, type Kit, type PartialKit, type QuestionCategory } from "@/lib/types";
 import { categoryLabel, difficultyDots } from "@/lib/ui";
 
 const categories: QuestionCategory[] = ["technical", "behavioural", "system-design", "company-fit"];
@@ -44,9 +45,29 @@ export function KitClient({ id }: { id: string }) {
   const [kitError, setKitError] = useState<KitError>(null);
   const [partial, setPartial] = useState<PartialKit | null>(null);
   const [toast, setToast] = useState<{ id: number; msg: string; bad?: boolean } | null>(null);
+  const [records, setRecords] = useState<Record<string, number>>({});
   const toastSeq = useRef(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const polling = docStatus === "loading" || docStatus === "generating";
+
+  useEffect(() => {
+    if (docStatus !== "ready") return;
+    let cancelled = false;
+    fetch(`/api/kits/${id}/practice`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        setRecords(
+          Object.fromEntries(
+            ((d.records || []) as { flashcardId: string; confidence: number }[]).map((r) => [r.flashcardId, r.confidence]),
+          ),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [docStatus, id]);
 
   function notify(msg: string, bad = false) {
     toastSeq.current += 1;
@@ -147,6 +168,38 @@ export function KitClient({ id }: { id: string }) {
           prompt: "New question",
           answer_outline: "Add your outline.",
           difficulty: 1 as const,
+          meta: { origin: "user" as const, edited: true, pinned: true },
+        },
+      ],
+    };
+    setKit(next);
+    setDirty(true);
+  }
+
+  function updateFlashcard(fid: string, patch: Partial<Flashcard>) {
+    if (!kit) return;
+    const next = {
+      ...kit,
+      flashcards: kit.flashcards.map((f) => (f.id === fid ? { ...f, ...patch, meta: { ...f.meta, edited: true } } : f)),
+    };
+    setKit(next);
+    setDirty(true);
+  }
+
+  function addFlashcard() {
+    if (!kit) return;
+    const taken = new Set(kit.flashcards.map((f) => f.id));
+    let n = kit.flashcards.length + 1;
+    while (taken.has(`f-user-${n}`)) n += 1;
+    const next = {
+      ...kit,
+      flashcards: [
+        ...kit.flashcards,
+        {
+          id: `f-user-${n}`,
+          front: "New flashcard",
+          back: "Add the answer.",
+          requirement_ids: [],
           meta: { origin: "user" as const, edited: true, pinned: true },
         },
       ],
@@ -281,6 +334,7 @@ export function KitClient({ id }: { id: string }) {
     QuestionCategory,
     Kit["questions"]
   >;
+  const weakSpots = computeWeakSpots(kit, records);
 
   return (
     <>
@@ -320,6 +374,40 @@ export function KitClient({ id }: { id: string }) {
             <div className="mt-3">
               <CoverageMeter kit={kit} />
             </div>
+          </section>
+
+          <section className="card p-5">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="section-title">Weak spots</h2>
+              {weakSpots.length ? (
+                <span className={`chip ${weakSpots.some((s) => s.level === "bad") ? "chip-bad" : "chip-warn"}`}>
+                  {weakSpots.length} open
+                </span>
+              ) : (
+                <span className="chip chip-ok">Clear</span>
+              )}
+            </div>
+            {weakSpots.length ? (
+              <>
+                <ul className="mt-3 space-y-2">
+                  {weakSpots.map((spot) => (
+                    <li className="rounded-xl border-2 border-[var(--line)] bg-[var(--background)] p-3" key={spot.id}>
+                      <p className={`text-sm font-bold leading-snug ${spot.level === "bad" ? "text-[var(--bad)]" : ""}`}>
+                        {spot.title}
+                      </p>
+                      <p className="mt-0.5 text-xs text-[var(--ink-soft)]">{spot.detail}</p>
+                    </li>
+                  ))}
+                </ul>
+                <Link className="btn btn-sm mt-3" href={`/kits/${id}/practice`}>
+                  Practise weak cards
+                </Link>
+              </>
+            ) : (
+              <p className="mt-2 text-sm text-[var(--ink-soft)]">
+                Coverage is clear and no cards are shaky. Weak spots reappear here as gaps or low practice scores show up.
+              </p>
+            )}
           </section>
 
           <section className="card p-5">
@@ -465,6 +553,69 @@ export function KitClient({ id }: { id: string }) {
               </div>
             </section>
           ))}
+
+          <section className="card p-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-extrabold tracking-tight">
+                Flashcards
+                <span className="ml-2 text-sm font-semibold text-[var(--ink-soft)]">{kit.flashcards.length}</span>
+              </h2>
+              <div className="flex gap-2">
+                <button className="btn btn-sm" onClick={() => addFlashcard()}>
+                  Add
+                </button>
+                <button className="btn btn-sm" onClick={() => regenerate("flashcards")}>
+                  Regenerate
+                </button>
+              </div>
+            </div>
+            <div className="space-y-4">
+              {kit.flashcards.map((f) => (
+                <article className="card p-4" key={f.id}>
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <button
+                      className="btn btn-sm btn-danger"
+                      aria-label="Delete flashcard"
+                      onClick={() => {
+                        setDirty(true);
+                        setKit({ ...kit, flashcards: kit.flashcards.filter((item) => item.id !== f.id) });
+                      }}
+                    >
+                      Delete
+                    </button>
+                    {f.meta?.edited ? <span className="chip">Edited</span> : null}
+                    <span className="ml-auto text-xs text-[var(--ink-soft)]">
+                      Covers: {f.requirement_ids.join(", ") || "manual"}
+                      {dirty ? " · Unsaved changes" : ""}
+                    </span>
+                  </div>
+                  <label className="label" htmlFor={`front-${f.id}`}>
+                    Front
+                  </label>
+                  <textarea
+                    className="field font-semibold"
+                    id={`front-${f.id}`}
+                    value={f.front}
+                    onChange={(e) => updateFlashcard(f.id, { front: e.target.value })}
+                  />
+                  <label className="label mt-2" htmlFor={`back-${f.id}`}>
+                    Back
+                  </label>
+                  <textarea
+                    className="field min-h-24"
+                    id={`back-${f.id}`}
+                    value={f.back}
+                    onChange={(e) => updateFlashcard(f.id, { back: e.target.value })}
+                  />
+                </article>
+              ))}
+              {!kit.flashcards.length ? (
+                <p className="rounded-xl border-2 border-dashed border-[var(--line)] p-4 text-sm text-[var(--ink-soft)]">
+                  No flashcards yet. Add one by hand or regenerate.
+                </p>
+              ) : null}
+            </div>
+          </section>
 
           <section className="card p-5">
             <h2 className="text-xl font-extrabold tracking-tight">Schedule</h2>

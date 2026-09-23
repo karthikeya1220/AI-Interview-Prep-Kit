@@ -89,11 +89,17 @@ Appendix A fields are preserved exactly. Generated records may also carry:
 meta: { origin: "generated" | "user", edited: boolean, pinned: boolean }
 ```
 
-When regenerating a question category, user-created, edited, or pinned items are kept and only unedited generated items are replaced.
+When regenerating a question category or the flashcards, user-created, edited, or pinned items are kept and only unedited generated items are replaced.
 
 ## Schedule Allocation
 
 The schedule clamps requested days to `1..60`, creates exactly that many day entries, sorts questions so harder and must-have-linked questions land earlier, then distributes questions round-robin. Durations are integer minutes based on question difficulty.
+
+## Creative Feature: Weak Spots Report
+
+The kit sidebar includes a **Weak spots** card (`src/lib/kit/weakSpots.ts`). It merges the deterministic coverage check with practice confidence records into one prioritised list: uncovered must-have requirements and flashcards rated 1/5 are marked bad; uncovered nice-to-haves and cards rated 2/5 are marked warn. Covered requirements and cards rated 3+ are not weak, and unpractised cards are left to practice mode, which already orders them first.
+
+The problem it solves: coverage and practice confidence lived in two different places, so a candidate could see "Coverage clear" and still not know what to spend the next 30 minutes on. The report answers that question in one list, worst first, with a direct link into practice.
 
 ## Edge Cases
 
@@ -104,6 +110,7 @@ The schedule clamps requested days to `1..60`, creates exactly that many day ent
 - Provider failures retry (honoring `Retry-After`) across a fallback chain of models, then fall back to deterministic generation, so the batch command remains runnable from a clean clone.
 - Free-tier cloud pools rate-limit aggressively (including per-day account quotas); on busy periods some LLM steps may use the deterministic fallback while others use the model. Local Ollama (`LLM_PROVIDER=ollama`) removes this failure mode entirely — no key, no quota, only hardware speed limits.
 - Duplicate submissions currently create separate kits; deduplication would be added if product requirements demanded it.
+- Crawl requests are spaced (250ms) and every subpage fetch has an 8s timeout; a failed page is recorded as a warning and skipped rather than retried into a longer run.
 
 ## Commands
 

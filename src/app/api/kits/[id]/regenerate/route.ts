@@ -5,7 +5,7 @@ import { companyBriefStep, ensureCoverageStep, generateFlashcardsStep, generateQ
 import { researchCompany } from "@/lib/retrieval/company";
 import { buildSchedule } from "@/lib/pipeline/schedule";
 import { validateKit } from "@/lib/validation/kit";
-import type { Question } from "@/lib/types";
+import type { Flashcard, Question } from "@/lib/types";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -68,7 +68,12 @@ export async function POST(request: Request, context: Context) {
     }
 
     if (section === "flashcards") {
-      kit.flashcards = await generateFlashcardsStep(requirements);
+      // Same rule as questions: user-written or edited cards survive regeneration.
+      const existing = (kit.flashcards || []) as Flashcard[];
+      const kept = existing.filter((f) => f.meta?.edited || f.meta?.pinned || f.meta?.origin === "user");
+      const fresh = await generateFlashcardsStep(requirements);
+      const taken = new Set<string>(kept.map((f) => f.id));
+      kit.flashcards = kept.concat(fresh.map((f) => ({ ...f, id: withUniqueId(f, taken) })));
     }
 
     if (section === "schedule") {
