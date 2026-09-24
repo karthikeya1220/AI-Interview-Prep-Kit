@@ -37,6 +37,11 @@ yarn-error.log*
 # tooling artifacts
 .playwright-mcp/
 .freebuff/
+.agents/
+.opencode/
+skills-lock.json
+walkthrough/raw/
+walkthrough/walkthrough-raw.webm
 
 # vercel
 .vercel
@@ -44,3 +49,4 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+brag-output-*/composition/

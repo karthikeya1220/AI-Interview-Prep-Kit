@@ -1,0 +1,110 @@
+{
+  "total": 69.73,
+  "switched": true,
+  "scenes": [
+    {
+      "name": "start",
+      "at": 0
+    },
+    {
+      "name": "s1_landing",
+      "at": 2.32
+    },
+    {
+      "name": "s1_dashboard",
+      "at": 8.3
+    },
+    {
+      "name": "s2_new_kit_form",
+      "at": 11.34
+    },
+    {
+      "name": "s2_form_filled",
+      "at": 14.42
+    },
+    {
+      "name": "s2_generating_dashboard",
+      "at": 14.83
+    },
+    {
+      "name": "s2_checklist",
+      "at": 16.75
+    },
+    {
+      "name": "s3_kit_ready",
+      "at": 25.52
+    },
+    {
+      "name": "s3_coverage",
+      "at": 28.09
+    },
+    {
+      "name": "s3_brief",
+      "at": 31.99
+    },
+    {
+      "name": "s3_research",
+      "at": 33.83
+    },
+    {
+      "name": "s4_questions",
+      "at": 35.14
+    },
+    {
+      "name": "s4_edited",
+      "at": 36.08
+    },
+    {
+      "name": "s4_pinned",
+      "at": 37.2
+    },
+    {
+      "name": "s4_reordered",
+      "at": 38.32
+    },
+    {
+      "name": "s4_saved",
+      "at": 39.89
+    },
+    {
+      "name": "s4_regenerated",
+      "at": 41.48
+    },
+    {
+      "name": "s4_pin_survived",
+      "at": 43.06
+    },
+    {
+      "name": "s5_practice",
+      "at": 46.72
+    },
+    {
+      "name": "s5_revealed",
+      "at": 48.88
+    },
+    {
+      "name": "s5_rated",
+      "at": 51.28
+    },
+    {
+      "name": "s5_second_card",
+      "at": 54.45
+    },
+    {
+      "name": "s6_schedule",
+      "at": 59.23
+    },
+    {
+      "name": "s7_weak_spots",
+      "at": 62.31
+    },
+    {
+      "name": "s7_coverage_defense",
+      "at": 64.84
+    },
+    {
+      "name": "outro",
+      "at": 69.71
+    }
+  ]
+}
